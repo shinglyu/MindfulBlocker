@@ -1,8 +1,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const url = urlParams.get('url');
+    
+    // Validate URL parameter
+    if (!url) {
+        showError('Invalid URL parameter');
+        return;
+    }
+    
     const domain = extractDomain(url);
     
+    // Use textContent to prevent XSS
     document.getElementById('domain').textContent = domain;
     
     let countdownInterval = null;
@@ -48,10 +56,18 @@ document.addEventListener('DOMContentLoaded', function() {
             domain: domain,
             url: url
         }, function(response) {
+            if (chrome.runtime.lastError) {
+                submitEmergencyBtn.disabled = false;
+                submitEmergencyBtn.textContent = 'Submit Override';
+                showError('Communication error. Please reload the page and try again.');
+                console.error('Runtime error:', chrome.runtime.lastError);
+                return;
+            }
+            
             submitEmergencyBtn.disabled = false;
             submitEmergencyBtn.textContent = 'Submit Override';
             
-            if (response.success) {
+            if (response && response.success) {
                 // Redirect to original URL
                 window.location.href = url;
             } else {
@@ -80,7 +96,13 @@ document.addEventListener('DOMContentLoaded', function() {
             action: 'checkPermissionStatus',
             domain: domain
         }, function(response) {
-            if (response.status === 'cooldown') {
+            if (chrome.runtime.lastError) {
+                showError('Communication error. Please reload the page.');
+                console.error('Runtime error:', chrome.runtime.lastError);
+                return;
+            }
+            
+            if (response && response.status === 'cooldown') {
                 startCountdown(response.cooldownUntil);
             } else {
                 // No longer in cooldown, redirect to justify page
@@ -126,11 +148,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    /**
+     * Display error message to user
+     * @param {string} message - Error message to display
+     */
     function showError(message) {
-        errorMessage.textContent = message;
+        errorMessage.textContent = message; // Use textContent to prevent XSS
         errorMessage.classList.remove('hidden');
     }
     
+    /**
+     * Extract domain from URL
+     * @param {string} url - URL to extract domain from
+     * @returns {string} Hostname or sanitized URL
+     */
     function extractDomain(url) {
         try {
             return new URL(url).hostname;

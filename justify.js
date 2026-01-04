@@ -1,8 +1,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const url = urlParams.get('url');
+    
+    // Validate URL parameter
+    if (!url) {
+        showError('Invalid URL parameter');
+        return;
+    }
+    
     const domain = extractDomain(url);
     
+    // Use textContent to prevent XSS
     document.getElementById('domain').textContent = domain;
     
     const form = document.getElementById('form');
@@ -29,9 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault();
         
         const justification = document.getElementById('justification').value.trim();
+        const maxLength = 500; // Limit justification length
         
         if (!justification) {
-            alert('Please provide a justification for accessing this site.');
+            showError('Please provide a justification for accessing this site.');
+            return;
+        }
+        
+        if (justification.length > maxLength) {
+            showError(`Justification is too long (maximum ${maxLength} characters).`);
             return;
         }
         
@@ -40,8 +54,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (selectedType === 'custom') {
             minutes = parseInt(customMinutesInput.value);
-            if (!minutes || minutes < 1) {
-                alert('Please enter a valid number of minutes.');
+            if (!minutes || minutes < 1 || minutes > 1440) { // Max 24 hours
+                showError('Please enter a valid number of minutes (1-1440).');
                 customMinutesInput.focus();
                 return;
             }
@@ -59,13 +73,21 @@ document.addEventListener('DOMContentLoaded', function() {
             justification: justification,
             minutes: minutes
         }, function(response) {
+            if (chrome.runtime.lastError) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Grant Access';
+                showError('Communication error. Please reload the page and try again.');
+                console.error('Runtime error:', chrome.runtime.lastError);
+                return;
+            }
+            
             if (response && response.success) {
                 // Redirect to the original URL
                 window.location.href = url;
             } else {
                 submitButton.disabled = false;
                 submitButton.textContent = 'Grant Access';
-                alert('Failed to grant access. Please try again.');
+                showError(response.error || 'Failed to grant access. Please try again.');
             }
         });
     });
@@ -73,6 +95,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // Auto-focus justification textarea
     document.getElementById('justification').focus();
     
+    /**
+     * Display error message to user
+     * @param {string} message - Error message to display
+     */
+    function showError(message) {
+        // Create or update error message element
+        let errorDiv = document.getElementById('error-message');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'error-message';
+            errorDiv.className = 'error-message';
+            errorDiv.style.cssText = 'background-color: #fee; border: 1px solid #c33; color: #c33; padding: 12px; margin: 16px 0; border-radius: 4px;';
+            form.insertBefore(errorDiv, form.firstChild);
+        }
+        errorDiv.textContent = message; // Use textContent to prevent XSS
+        errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    /**
+     * Extract domain from URL
+     * @param {string} url - URL to extract domain from
+     * @returns {string} Hostname or sanitized URL
+     */
     function extractDomain(url) {
         try {
             return new URL(url).hostname;

@@ -36,17 +36,24 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
-// Generate random 32-character emergency code
+/**
+ * Generate cryptographically secure 32-character emergency code
+ * @returns {string} 32-character alphanumeric code
+ */
 function generateEmergencyCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let code = '';
-  for (let i = 0; i < 32; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
+  const array = new Uint8Array(24); // 24 bytes = 32 base64 chars
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/[+/=]/g, c => ({'+':'A','/':'B','=':'C'}[c]))
+    .slice(0, 32);
 }
 
-// Check if URL matches a blocked domain pattern
+/**
+ * Check if URL matches a blocked domain pattern
+ * @param {string} url - The URL to check
+ * @param {string} pattern - The domain pattern (supports wildcard)
+ * @returns {boolean} True if URL matches pattern
+ */
 function matchesDomain(url, pattern) {
   try {
     const hostname = new URL(url).hostname;
@@ -60,7 +67,11 @@ function matchesDomain(url, pattern) {
   }
 }
 
-// Extract domain from URL
+/**
+ * Extract domain from URL
+ * @param {string} url - The URL to extract domain from
+ * @returns {string} The hostname or original URL if invalid
+ */
 function extractDomain(url) {
   try {
     return new URL(url).hostname;
@@ -69,7 +80,11 @@ function extractDomain(url) {
   }
 }
 
-// Check if domain should be blocked
+/**
+ * Check if domain should be blocked and return blocking reason
+ * @param {string} url - The URL to check
+ * @returns {Promise<Object>} Blocking status and reason
+ */
 async function shouldBlockDomain(url) {
   const { blockedDomains, permissions } = await chrome.storage.local.get(['blockedDomains', 'permissions']);
   
@@ -176,150 +191,238 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Handle saving permission after justification
-async function handleSavePermission(message, sender, sendResponse) {
-  const { domain, justification, minutes } = message;
-  const now = Date.now();
-  const expiresAt = now + (minutes * 60 * 1000);
-  const { settings } = await chrome.storage.local.get('settings');
-  const cooldownUntil = expiresAt + (settings.cooldownMinutes * 60 * 1000);
+/**
+ * Prune old logs to prevent unbounded storage growth
+ * @param {Array} logs - Array of usage log entries
+ * @returns {Array} Pruned log array
+ */
+function pruneOldLogs(logs) {
+  const MAX_LOGS = 1000;
+  const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+  const cutoffTime = Date.now() - MAX_AGE_MS;
   
-  // Update permissions
-  const { permissions } = await chrome.storage.local.get('permissions');
-  permissions[domain] = {
-    expiresAt: expiresAt,
-    cooldownUntil: cooldownUntil
-  };
-  await chrome.storage.local.set({ permissions });
-  
-  // Log usage
-  const { usageLogs } = await chrome.storage.local.get('usageLogs');
-  const logEntry = {
-    id: crypto.randomUUID(),
-    domain: domain,
-    justification: justification,
-    grantedAt: now,
-    duration: minutes,
-    expiresAt: expiresAt,
-    wasEmergencyOverride: false
-  };
-  usageLogs.push(logEntry);
-  await chrome.storage.local.set({ usageLogs });
-  
-  // Set alarm for expiration
-  chrome.alarms.create(`expire-${domain}`, { when: expiresAt });
-  
-  sendResponse({ success: true });
+  return logs
+    .filter(log => log.grantedAt > cutoffTime)
+    .slice(-MAX_LOGS);
 }
 
-// Handle emergency code verification
-async function handleEmergencyCode(message, sender, sendResponse) {
-  const { code, domain, url } = message;
-  const { settings } = await chrome.storage.local.get('settings');
-  
-  if (code === settings.emergencyCode) {
-    // Grant permission
+/**
+ * Handle saving permission after justification
+ */
+async function handleSavePermission(message, sender, sendResponse) {
+  try {
+    const { domain, justification, minutes } = message;
     const now = Date.now();
-    const { permissions } = await chrome.storage.local.get('permissions');
-    const expiresAt = now + (settings.defaultMinutes * 60 * 1000);
+    const expiresAt = now + (minutes * 60 * 1000);
+    const { settings } = await chrome.storage.local.get('settings');
     const cooldownUntil = expiresAt + (settings.cooldownMinutes * 60 * 1000);
     
+    // Update permissions
+    const { permissions } = await chrome.storage.local.get('permissions');
     permissions[domain] = {
       expiresAt: expiresAt,
       cooldownUntil: cooldownUntil
     };
     await chrome.storage.local.set({ permissions });
     
-    // Log as emergency override
+    // Log usage and prune old logs
     const { usageLogs } = await chrome.storage.local.get('usageLogs');
     const logEntry = {
       id: crypto.randomUUID(),
       domain: domain,
-      justification: 'EMERGENCY OVERRIDE',
+      justification: justification,
       grantedAt: now,
-      duration: settings.defaultMinutes,
+      duration: minutes,
       expiresAt: expiresAt,
-      wasEmergencyOverride: true
+      wasEmergencyOverride: false
     };
     usageLogs.push(logEntry);
-    await chrome.storage.local.set({ usageLogs });
+    const prunedLogs = pruneOldLogs(usageLogs);
+    await chrome.storage.local.set({ usageLogs: prunedLogs });
     
-    // Set alarm
+    // Set alarm for expiration
     chrome.alarms.create(`expire-${domain}`, { when: expiresAt });
     
-    sendResponse({ success: true, url: url });
-  } else {
-    sendResponse({ success: false, error: 'Incorrect emergency code' });
+    sendResponse({ success: true });
+  } catch (error) {
+    console.error('Error saving permission:', error);
+    sendResponse({ success: false, error: error.message });
   }
 }
 
-// Handle get settings
+/**
+ * Handle emergency code verification
+ */
+async function handleEmergencyCode(message, sender, sendResponse) {
+  try {
+    const { code, domain, url } = message;
+    const { settings } = await chrome.storage.local.get('settings');
+    
+    if (code === settings.emergencyCode) {
+      // Grant permission
+      const now = Date.now();
+      const { permissions } = await chrome.storage.local.get('permissions');
+      const expiresAt = now + (settings.defaultMinutes * 60 * 1000);
+      const cooldownUntil = expiresAt + (settings.cooldownMinutes * 60 * 1000);
+      
+      permissions[domain] = {
+        expiresAt: expiresAt,
+        cooldownUntil: cooldownUntil
+      };
+      await chrome.storage.local.set({ permissions });
+      
+      // Log as emergency override and prune old logs
+      const { usageLogs } = await chrome.storage.local.get('usageLogs');
+      const logEntry = {
+        id: crypto.randomUUID(),
+        domain: domain,
+        justification: 'EMERGENCY OVERRIDE',
+        grantedAt: now,
+        duration: settings.defaultMinutes,
+        expiresAt: expiresAt,
+        wasEmergencyOverride: true
+      };
+      usageLogs.push(logEntry);
+      const prunedLogs = pruneOldLogs(usageLogs);
+      await chrome.storage.local.set({ usageLogs: prunedLogs });
+      
+      // Set alarm
+      chrome.alarms.create(`expire-${domain}`, { when: expiresAt });
+      
+      sendResponse({ success: true, url: url });
+    } else {
+      sendResponse({ success: false, error: 'Incorrect emergency code' });
+    }
+  } catch (error) {
+    console.error('Error handling emergency code:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Handle get settings request
+ */
 async function handleGetSettings(sendResponse) {
-  const { settings } = await chrome.storage.local.get('settings');
-  sendResponse({ settings });
+  try {
+    const { settings } = await chrome.storage.local.get('settings');
+    sendResponse({ settings });
+  } catch (error) {
+    console.error('Error getting settings:', error);
+    sendResponse({ settings: null, error: error.message });
+  }
 }
 
-// Handle update settings
+/**
+ * Handle update settings request
+ */
 async function handleUpdateSettings(message, sendResponse) {
-  const { settings } = message;
-  await chrome.storage.local.set({ settings });
-  sendResponse({ success: true });
+  try {
+    const { settings } = message;
+    await chrome.storage.local.set({ settings });
+    sendResponse({ success: true });
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    sendResponse({ success: false, error: error.message });
+  }
 }
 
-// Handle get blocked domains
+/**
+ * Handle get blocked domains request
+ */
 async function handleGetBlockedDomains(sendResponse) {
-  const { blockedDomains } = await chrome.storage.local.get('blockedDomains');
-  sendResponse({ blockedDomains });
+  try {
+    const { blockedDomains } = await chrome.storage.local.get('blockedDomains');
+    sendResponse({ blockedDomains });
+  } catch (error) {
+    console.error('Error getting blocked domains:', error);
+    sendResponse({ blockedDomains: [], error: error.message });
+  }
 }
 
-// Handle update blocked domains
+/**
+ * Handle update blocked domains request
+ */
 async function handleUpdateBlockedDomains(message, sendResponse) {
-  const { blockedDomains } = message;
-  await chrome.storage.local.set({ blockedDomains });
-  sendResponse({ success: true });
+  try {
+    const { blockedDomains } = message;
+    await chrome.storage.local.set({ blockedDomains });
+    sendResponse({ success: true });
+  } catch (error) {
+    console.error('Error updating blocked domains:', error);
+    sendResponse({ success: false, error: error.message });
+  }
 }
 
-// Handle get usage logs
+/**
+ * Handle get usage logs request
+ */
 async function handleGetUsageLogs(sendResponse) {
-  const { usageLogs } = await chrome.storage.local.get('usageLogs');
-  sendResponse({ usageLogs: usageLogs || [] });
+  try {
+    const { usageLogs } = await chrome.storage.local.get('usageLogs');
+    sendResponse({ usageLogs: usageLogs || [] });
+  } catch (error) {
+    console.error('Error getting usage logs:', error);
+    sendResponse({ usageLogs: [], error: error.message });
+  }
 }
 
-// Handle check permission status
+/**
+ * Handle check permission status request
+ */
 async function handleCheckPermissionStatus(message, sendResponse) {
-  const { domain } = message;
-  const { permissions } = await chrome.storage.local.get('permissions');
-  const permission = permissions[domain];
-  const now = Date.now();
-  
-  if (!permission) {
-    sendResponse({ status: 'no-permission' });
-    return;
+  try {
+    const { domain } = message;
+    const { permissions } = await chrome.storage.local.get('permissions');
+    const permission = permissions[domain];
+    const now = Date.now();
+    
+    if (!permission) {
+      sendResponse({ status: 'no-permission' });
+      return;
+    }
+    
+    if (permission.cooldownUntil && permission.cooldownUntil > now) {
+      sendResponse({ 
+        status: 'cooldown',
+        cooldownUntil: permission.cooldownUntil
+      });
+      return;
+    }
+    
+    if (permission.expiresAt && permission.expiresAt > now) {
+      sendResponse({ 
+        status: 'active',
+        expiresAt: permission.expiresAt
+      });
+      return;
+    }
+    
+    sendResponse({ status: 'expired' });
+  } catch (error) {
+    console.error('Error checking permission status:', error);
+    sendResponse({ status: 'error', error: error.message });
   }
-  
-  if (permission.cooldownUntil && permission.cooldownUntil > now) {
-    sendResponse({ 
-      status: 'cooldown',
-      cooldownUntil: permission.cooldownUntil
-    });
-    return;
-  }
-  
-  if (permission.expiresAt && permission.expiresAt > now) {
-    sendResponse({ 
-      status: 'active',
-      expiresAt: permission.expiresAt
-    });
-    return;
-  }
-  
-  sendResponse({ status: 'expired' });
 }
 
-// Handle alarm events (timer expirations)
+/**
+ * Handle alarm events (timer expirations)
+ */
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name.startsWith('expire-')) {
-    // Permission expired, cooldown is already set
-    console.log(`Permission expired for: ${alarm.name}`);
+    const domain = alarm.name.replace('expire-', '');
+    console.log(`Permission expired for: ${domain}`);
+    
+    // Optional: Close tabs accessing the expired domain
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        if (tab.url && matchesDomain(tab.url, domain)) {
+          const blockUrl = chrome.runtime.getURL(`blocked.html?url=${encodeURIComponent(tab.url)}`);
+          await chrome.tabs.update(tab.id, { url: blockUrl });
+        }
+      }
+    } catch (error) {
+      console.error('Error handling expired permission:', error);
+    }
   }
 });

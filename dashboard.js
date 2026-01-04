@@ -6,6 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadUsageData() {
     chrome.runtime.sendMessage({ action: 'getUsageLogs' }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('Runtime error:', chrome.runtime.lastError);
+            showError('Failed to load usage data. Please reload the page.');
+            return;
+        }
         usageLogs = response.usageLogs || [];
         renderDashboard();
     });
@@ -37,7 +42,7 @@ function calculateStats() {
         }
     }
     
-    // Update UI
+    // Update UI with textContent to prevent XSS
     document.getElementById('total-sessions').textContent = totalSessions;
     document.getElementById('total-time').textContent = formatMinutes(totalTime);
     document.getElementById('most-accessed').textContent = mostAccessed;
@@ -98,16 +103,17 @@ function renderFrequencyChart() {
         const bar = document.createElement('div');
         bar.className = 'bar';
         bar.style.height = `${height}%`;
+        // Use textContent for title to prevent XSS
         bar.title = `${item.domain}: ${item.count} sessions, ${formatMinutes(item.totalTime)}`;
         
         const barValue = document.createElement('div');
         barValue.className = 'bar-value';
-        barValue.textContent = item.count;
+        barValue.textContent = item.count; // Use textContent to prevent XSS
         bar.appendChild(barValue);
         
         const barLabel = document.createElement('div');
         barLabel.className = 'bar-label';
-        barLabel.textContent = item.domain;
+        barLabel.textContent = item.domain; // Use textContent to prevent XSS
         
         barItem.appendChild(bar);
         barItem.appendChild(barLabel);
@@ -143,30 +149,30 @@ function renderHistoryTable() {
         const row = document.createElement('tr');
         
         const dateCell = document.createElement('td');
-        dateCell.textContent = formatDateTime(log.grantedAt);
+        dateCell.textContent = formatDateTime(log.grantedAt); // Use textContent to prevent XSS
         
         const domainCell = document.createElement('td');
-        domainCell.textContent = log.domain;
+        domainCell.textContent = log.domain; // Use textContent to prevent XSS
         
         const justificationCell = document.createElement('td');
-        justificationCell.textContent = log.justification;
+        justificationCell.textContent = log.justification; // Use textContent to prevent XSS
         justificationCell.style.maxWidth = '300px';
         justificationCell.style.overflow = 'hidden';
         justificationCell.style.textOverflow = 'ellipsis';
         justificationCell.style.whiteSpace = 'nowrap';
-        justificationCell.title = log.justification;
+        justificationCell.title = log.justification; // Title also safe with textContent
         
         const durationCell = document.createElement('td');
-        durationCell.textContent = `${log.duration} min`;
+        durationCell.textContent = `${log.duration} min`; // Use textContent to prevent XSS
         
         const typeCell = document.createElement('td');
         if (log.wasEmergencyOverride) {
             const badge = document.createElement('span');
             badge.className = 'override-badge';
-            badge.textContent = 'OVERRIDE';
+            badge.textContent = 'OVERRIDE'; // Use textContent to prevent XSS
             typeCell.appendChild(badge);
         } else {
-            typeCell.textContent = 'Normal';
+            typeCell.textContent = 'Normal'; // Use textContent to prevent XSS
         }
         
         row.appendChild(dateCell);
@@ -177,6 +183,25 @@ function renderHistoryTable() {
         
         tbody.appendChild(row);
     });
+}
+
+/**
+ * Display error message to user
+ * @param {string} message - Error message to display
+ */
+function showError(message) {
+    let errorDiv = document.getElementById('error-message');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'error-message';
+        errorDiv.style.cssText = 'background-color: #fee; border: 1px solid #c33; color: #c33; padding: 12px; margin: 16px; border-radius: 4px;';
+        const container = document.querySelector('.dashboard-container');
+        if (container) {
+            container.insertBefore(errorDiv, container.firstChild);
+        }
+    }
+    errorDiv.textContent = message; // Use textContent to prevent XSS
+    errorDiv.style.display = 'block';
 }
 
 function formatMinutes(minutes) {
