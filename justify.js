@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const customMinutesInput = document.getElementById('custom-minutes');
     const customRadio = document.getElementById('custom');
     const submitButton = form.querySelector('button[type="submit"]');
+    const blockImmediatelyBtn = document.getElementById('block-immediately-btn');
     
     // Enable/disable custom minutes input
     customRadio.addEventListener('change', function() {
@@ -90,6 +91,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 showError(response.error || 'Failed to grant access. Please try again.');
             }
         });
+    });
+    
+    // Handle "Block Immediately" button
+    blockImmediatelyBtn.addEventListener('click', function() {
+        // Close the current tab and return to previous page
+        window.close();
     });
     
     // Auto-focus justification textarea

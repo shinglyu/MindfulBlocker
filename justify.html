@@ -33,18 +33,6 @@
                             <input type="radio" id="15min" name="time" value="15">
                             <label for="15min">15 minutes</label>
                         </div>
-                        <div class="radio-option">
-                            <input type="radio" id="30min" name="time" value="30">
-                            <label for="30min">30 minutes</label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" id="1hour" name="time" value="60">
-                            <label for="1hour">1 hour</label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" id="2hours" name="time" value="120">
-                            <label for="2hours">2 hours</label>
-                        </div>
                         <div class="radio-option custom-option">
                             <input type="radio" id="custom" name="time" value="custom">
                             <label for="custom">Custom:</label>
@@ -57,7 +45,10 @@
                     ℹ️ After your time expires, there will be a cooldown period before you can request access again.
                 </div>
                 
-                <button type="submit" class="btn-primary">Grant Access</button>
+                <div style="display: flex; gap: 10px; justify-content: space-between;">
+                    <button type="button" id="block-immediately-btn" class="btn-secondary" style="flex: 1;">Block Immediately</button>
+                    <button type="submit" class="btn-primary" style="flex: 1;">Grant Access</button>
+                </div>
             </form>
         </div>
         

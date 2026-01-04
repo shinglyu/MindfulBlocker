@@ -38,7 +38,6 @@ async function loadData() {
             return;
         }
         settings = response.settings || {};
-        document.getElementById('default-minutes').value = settings.defaultMinutes || 5;
         document.getElementById('cooldown-minutes').value = settings.cooldownMinutes || 30;
     });
 }
@@ -160,20 +159,13 @@ function saveBlockedDomains() {
 }
 
 function saveSettings() {
-    const defaultMinutes = parseInt(document.getElementById('default-minutes').value);
     const cooldownMinutes = parseInt(document.getElementById('cooldown-minutes').value);
-    
-    if (!defaultMinutes || defaultMinutes < 1 || defaultMinutes > 1440) {
-        showError('Please enter a valid default duration (1-1440 minutes)');
-        return;
-    }
     
     if (!cooldownMinutes || cooldownMinutes < 1 || cooldownMinutes > 1440) {
         showError('Please enter a valid cooldown period (1-1440 minutes)');
         return;
     }
     
-    settings.defaultMinutes = defaultMinutes;
     settings.cooldownMinutes = cooldownMinutes;
     
     chrome.runtime.sendMessage({

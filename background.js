@@ -11,7 +11,6 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!result.settings) {
     await chrome.storage.local.set({
       settings: {
-        defaultMinutes: 5,
         cooldownMinutes: 30
       }
     });
