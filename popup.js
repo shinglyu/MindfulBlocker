@@ -16,12 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Save settings button
     document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
-    
-    // Toggle emergency code visibility
-    document.getElementById('toggle-code-btn').addEventListener('click', toggleEmergencyCode);
-    
-    // Copy code on click
-    document.getElementById('emergency-code').addEventListener('click', copyEmergencyCode);
 });
 
 async function loadData() {
@@ -46,8 +40,6 @@ async function loadData() {
         settings = response.settings || {};
         document.getElementById('default-minutes').value = settings.defaultMinutes || 5;
         document.getElementById('cooldown-minutes').value = settings.cooldownMinutes || 30;
-        // Use textContent to prevent XSS
-        document.getElementById('emergency-code').textContent = settings.emergencyCode || 'N/A';
     });
 }
 
@@ -205,36 +197,6 @@ function saveSettings() {
         } else {
             showError('Failed to save settings. Please try again.');
         }
-    });
-}
-
-function toggleEmergencyCode() {
-    const codeDisplay = document.getElementById('emergency-code');
-    const toggleBtn = document.getElementById('toggle-code-btn');
-    
-    if (codeDisplay.classList.contains('hidden')) {
-        codeDisplay.classList.remove('hidden');
-        toggleBtn.textContent = 'Hide Code';
-    } else {
-        codeDisplay.classList.add('hidden');
-        toggleBtn.textContent = 'Show Code';
-    }
-}
-
-function copyEmergencyCode() {
-    const code = settings.emergencyCode;
-    if (!code) return;
-    
-    navigator.clipboard.writeText(code).then(() => {
-        const codeDisplay = document.getElementById('emergency-code');
-        const originalText = codeDisplay.textContent;
-        codeDisplay.textContent = 'Copied!';
-        setTimeout(() => {
-            codeDisplay.textContent = originalText;
-        }, 1500);
-    }).catch(err => {
-        console.error('Failed to copy code:', err);
-        showError('Failed to copy code to clipboard');
     });
 }
 

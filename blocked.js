@@ -18,73 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check permission status and start countdown
     checkPermissionStatus();
     
-    // Emergency override UI
-    const showEmergencyBtn = document.getElementById('show-emergency');
-    const emergencyForm = document.getElementById('emergency-form');
-    const cancelEmergencyBtn = document.getElementById('cancel-emergency');
-    const submitEmergencyBtn = document.getElementById('submit-emergency');
-    const emergencyCodeInput = document.getElementById('emergency-code');
-    const errorMessage = document.getElementById('error-message');
-    
-    showEmergencyBtn.addEventListener('click', function() {
-        emergencyForm.classList.remove('hidden');
-        showEmergencyBtn.classList.add('hidden');
-        emergencyCodeInput.focus();
-    });
-    
-    cancelEmergencyBtn.addEventListener('click', function() {
-        emergencyForm.classList.add('hidden');
-        showEmergencyBtn.classList.remove('hidden');
-        emergencyCodeInput.value = '';
-        errorMessage.classList.add('hidden');
-    });
-    
-    submitEmergencyBtn.addEventListener('click', function() {
-        const code = emergencyCodeInput.value.trim();
-        
-        if (!code) {
-            showError('Please enter the emergency code');
-            return;
-        }
-        
-        submitEmergencyBtn.disabled = true;
-        submitEmergencyBtn.textContent = 'Verifying...';
-        
-        chrome.runtime.sendMessage({
-            action: 'checkEmergencyCode',
-            code: code,
-            domain: domain,
-            url: url
-        }, function(response) {
-            if (chrome.runtime.lastError) {
-                submitEmergencyBtn.disabled = false;
-                submitEmergencyBtn.textContent = 'Submit Override';
-                showError('Communication error. Please reload the page and try again.');
-                console.error('Runtime error:', chrome.runtime.lastError);
-                return;
-            }
-            
-            submitEmergencyBtn.disabled = false;
-            submitEmergencyBtn.textContent = 'Submit Override';
-            
-            if (response && response.success) {
-                // Redirect to original URL
-                window.location.href = url;
-            } else {
-                showError(response.error || 'Invalid emergency code');
-                emergencyCodeInput.value = '';
-                emergencyCodeInput.focus();
-            }
-        });
-    });
-    
-    // Allow Enter key to submit
-    emergencyCodeInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            submitEmergencyBtn.click();
-        }
-    });
-    
     // Open settings
     document.getElementById('open-settings').addEventListener('click', function(e) {
         e.preventDefault();
@@ -153,6 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * @param {string} message - Error message to display
      */
     function showError(message) {
+        const errorMessage = document.getElementById('error-message');
         errorMessage.textContent = message; // Use textContent to prevent XSS
         errorMessage.classList.remove('hidden');
     }

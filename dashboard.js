@@ -25,7 +25,6 @@ function renderDashboard() {
 function calculateStats() {
     const totalSessions = usageLogs.length;
     const totalTime = usageLogs.reduce((sum, log) => sum + log.duration, 0);
-    const overrides = usageLogs.filter(log => log.wasEmergencyOverride).length;
     
     // Calculate most accessed domain
     const domainCounts = {};
@@ -46,7 +45,6 @@ function calculateStats() {
     document.getElementById('total-sessions').textContent = totalSessions;
     document.getElementById('total-time').textContent = formatMinutes(totalTime);
     document.getElementById('most-accessed').textContent = mostAccessed;
-    document.getElementById('total-overrides').textContent = overrides;
 }
 
 function renderFrequencyChart() {
@@ -130,7 +128,7 @@ function renderHistoryTable() {
     if (usageLogs.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="empty-state">
+                <td colspan="4" class="empty-state">
                     <div class="empty-state-icon">📋</div>
                     <div>No access history yet</div>
                 </td>
@@ -165,21 +163,10 @@ function renderHistoryTable() {
         const durationCell = document.createElement('td');
         durationCell.textContent = `${log.duration} min`; // Use textContent to prevent XSS
         
-        const typeCell = document.createElement('td');
-        if (log.wasEmergencyOverride) {
-            const badge = document.createElement('span');
-            badge.className = 'override-badge';
-            badge.textContent = 'OVERRIDE'; // Use textContent to prevent XSS
-            typeCell.appendChild(badge);
-        } else {
-            typeCell.textContent = 'Normal'; // Use textContent to prevent XSS
-        }
-        
         row.appendChild(dateCell);
         row.appendChild(domainCell);
         row.appendChild(justificationCell);
         row.appendChild(durationCell);
-        row.appendChild(typeCell);
         
         tbody.appendChild(row);
     });

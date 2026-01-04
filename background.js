@@ -9,12 +9,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   const result = await chrome.storage.local.get(['settings', 'blockedDomains', 'permissions', 'usageLogs']);
   
   if (!result.settings) {
-    const emergencyCode = generateEmergencyCode();
     await chrome.storage.local.set({
       settings: {
         defaultMinutes: 5,
-        cooldownMinutes: 30,
-        emergencyCode: emergencyCode
+        cooldownMinutes: 30
       }
     });
   }
@@ -37,18 +35,6 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Generate cryptographically secure 32-character emergency code
- * @returns {string} 32-character alphanumeric code
- */
-function generateEmergencyCode() {
-  const array = new Uint8Array(24); // 24 bytes = 32 base64 chars
-  crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...array))
-    .replace(/[+/=]/g, c => ({'+':'A','/':'B','=':'C'}[c]))
-    .slice(0, 32);
-}
-
-/**
  * Check if URL matches a blocked domain pattern
  * @param {string} url - The URL to check
  * @param {string} pattern - The domain pattern (supports wildcard)
@@ -57,12 +43,20 @@ function generateEmergencyCode() {
 function matchesDomain(url, pattern) {
   try {
     const hostname = new URL(url).hostname;
+    console.log('matchesDomain - hostname:', hostname, 'pattern:', pattern);
+    
     if (pattern.startsWith('*.')) {
       const suffix = pattern.slice(2);
-      return hostname === suffix || hostname.endsWith('.' + suffix);
+      const matches = hostname === suffix || hostname.endsWith('.' + suffix);
+      console.log('Wildcard match - suffix:', suffix, 'matches:', matches);
+      return matches;
     }
-    return hostname === pattern;
+    
+    const matches = hostname === pattern;
+    console.log('Exact match:', matches);
+    return matches;
   } catch (e) {
+    console.error('matchesDomain error:', e);
     return false;
   }
 }
@@ -88,15 +82,25 @@ function extractDomain(url) {
 async function shouldBlockDomain(url) {
   const { blockedDomains, permissions } = await chrome.storage.local.get(['blockedDomains', 'permissions']);
   
+  console.log('shouldBlockDomain - blockedDomains from storage:', blockedDomains);
+  
   if (!blockedDomains || blockedDomains.length === 0) {
+    console.log('No blocked domains configured');
     return { blocked: false };
   }
   
   // Check if URL matches any blocked domain
-  const matchedDomain = blockedDomains.find(d => d.enabled && matchesDomain(url, d.pattern));
+  const matchedDomain = blockedDomains.find(d => {
+    console.log('Checking domain:', d);
+    return d.enabled && matchesDomain(url, d.pattern);
+  });
+  
   if (!matchedDomain) {
+    console.log('No matching blocked domain found');
     return { blocked: false };
   }
+  
+  console.log('Matched domain:', matchedDomain);
   
   const domain = extractDomain(url);
   const permission = permissions[domain];
@@ -161,11 +165,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'savePermission') {
     handleSavePermission(message, sender, sendResponse);
     return true; // Keep channel open for async response
-  }
-  
-  if (message.action === 'checkEmergencyCode') {
-    handleEmergencyCode(message, sender, sendResponse);
-    return true;
   }
   
   if (message.action === 'getSettings') {
@@ -254,55 +253,6 @@ async function handleSavePermission(message, sender, sendResponse) {
     sendResponse({ success: true });
   } catch (error) {
     console.error('Error saving permission:', error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
-
-/**
- * Handle emergency code verification
- */
-async function handleEmergencyCode(message, sender, sendResponse) {
-  try {
-    const { code, domain, url } = message;
-    const { settings } = await chrome.storage.local.get('settings');
-    
-    if (code === settings.emergencyCode) {
-      // Grant permission
-      const now = Date.now();
-      const { permissions } = await chrome.storage.local.get('permissions');
-      const expiresAt = now + (settings.defaultMinutes * 60 * 1000);
-      const cooldownUntil = expiresAt + (settings.cooldownMinutes * 60 * 1000);
-      
-      permissions[domain] = {
-        expiresAt: expiresAt,
-        cooldownUntil: cooldownUntil
-      };
-      await chrome.storage.local.set({ permissions });
-      
-      // Log as emergency override and prune old logs
-      const { usageLogs } = await chrome.storage.local.get('usageLogs');
-      const logEntry = {
-        id: crypto.randomUUID(),
-        domain: domain,
-        justification: 'EMERGENCY OVERRIDE',
-        grantedAt: now,
-        duration: settings.defaultMinutes,
-        expiresAt: expiresAt,
-        wasEmergencyOverride: true
-      };
-      usageLogs.push(logEntry);
-      const prunedLogs = pruneOldLogs(usageLogs);
-      await chrome.storage.local.set({ usageLogs: prunedLogs });
-      
-      // Set alarm
-      chrome.alarms.create(`expire-${domain}`, { when: expiresAt });
-      
-      sendResponse({ success: true, url: url });
-    } else {
-      sendResponse({ success: false, error: 'Incorrect emergency code' });
-    }
-  } catch (error) {
-    console.error('Error handling emergency code:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
