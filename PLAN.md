@@ -79,15 +79,31 @@
 - [x] Ensure first-time access (no existing permission) shows justify page, not blocked page
 - [x] The current logic already handles this correctly - verified no regression needed
 
-#### Phase 7: Testing
+#### Phase 7: Bug Fix - Immediate Cooldown After Justification ✅
+- [x] Identified bug: cooldown check was happening before active permission check
+- [x] Root cause: In `shouldBlockDomain()`, cooldown was checked first, blocking users immediately after granting access
+- [x] Solution: Swapped check order - now checks active permission first, then cooldown
+- [x] This ensures users can access sites during their granted permission period
+- [x] Cooldown only applies after the permission expires
+
+**Technical Details:**
+When a user grants 5 minutes access:
+- `expiresAt` = now + 5 min
+- `cooldownUntil` = now + 35 min (5 min + 30 min cooldown)
+
+Previous logic checked cooldown first, saw cooldownUntil > now, and blocked immediately.
+New logic checks active permission first, sees expiresAt > now, and allows access.
+
+#### Phase 8: Testing
 - [ ] Test blocked domain flow without emergency override
 - [ ] Verify first-time access shows justify page
-- [ ] Verify cooldown works after normal access
+- [ ] Verify users can access site after justification during permission period
+- [ ] Verify cooldown works after permission expires
 - [ ] Test settings page without emergency code section
 - [ ] Check dashboard displays correctly
 
-#### Phase 8: Documentation & Commit
-- [x] Update PLAN.md with completion status
+#### Phase 9: Documentation & Commit
+- [x] Update PLAN.md with bug fix details
 - [ ] Create git commit with descriptive message
 - [ ] Update README if necessary
 

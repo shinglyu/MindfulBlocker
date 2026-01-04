@@ -106,7 +106,12 @@ async function shouldBlockDomain(url) {
   const permission = permissions[domain];
   const now = Date.now();
   
-  // Check if in cooldown
+  // Check if has active permission first (this takes precedence over cooldown)
+  if (permission && permission.expiresAt && permission.expiresAt > now) {
+    return { blocked: false };
+  }
+  
+  // Check if in cooldown (only applies after permission has expired)
   if (permission && permission.cooldownUntil && permission.cooldownUntil > now) {
     return { 
       blocked: true, 
@@ -114,11 +119,6 @@ async function shouldBlockDomain(url) {
       cooldownUntil: permission.cooldownUntil,
       domain: domain
     };
-  }
-  
-  // Check if has active permission
-  if (permission && permission.expiresAt && permission.expiresAt > now) {
-    return { blocked: false };
   }
   
   // No permission, needs justification
