@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Settings</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            width: 400px;
+            margin: 0;
+            padding: 0;
+        }
+        .popup-container {
+            padding: 16px;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .domain-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .domain-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .domain-item:last-child {
+            border-bottom: none;
+        }
+        .domain-toggle {
+            margin-right: 10px;
+        }
+        .domain-name {
+            flex: 1;
+            font-size: 13px;
+        }
+        .domain-remove {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px 8px;
+        }
+        .domain-remove:hover {
+            color: #c82333;
+        }
+        .add-domain-form {
+            display: flex;
+            gap: 8px;
+        }
+        .add-domain-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .add-btn {
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .add-btn:hover {
+            background: #218838;
+        }
+        .settings-group {
+            margin-bottom: 16px;
+        }
+        .settings-label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        .settings-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        .emergency-code-section {
+            background: #fff3cd;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 12px;
+        }
+        .emergency-code-display {
+            font-family: monospace;
+            font-size: 12px;
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+        .emergency-code-display.hidden {
+            filter: blur(8px);
+            user-select: none;
+        }
+        .toggle-code-btn {
+            font-size: 12px;
+            padding: 4px 8px;
+            margin-top: 8px;
+        }
+        .dashboard-link {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            background: #f8f9fa;
+            color: #007bff;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 16px;
+            font-size: 13px;
+        }
+        .dashboard-link:hover {
+            background: #e9ecef;
+        }
+        .hint-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-container">
+        <h2 style="margin-top: 0;">Flow Settings</h2>
+        
+        <div class="section">
+            <div class="section-title">Blocked Domains</div>
+            <div class="domain-list" id="domain-list">
+                <div style="padding: 20px; text-align: center; color: #999;">Loading...</div>
+            </div>
+            <div class="add-domain-form">
+                <input type="text" id="new-domain" class="add-domain-input" placeholder="e.g., *.twitter.com or reddit.com">
+                <button id="add-domain-btn" class="add-btn">Add</button>
+            </div>
+            <div class="hint-text">Use *.domain.com to block all subdomains</div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">Time Settings</div>
+            <div class="settings-group">
+                <label class="settings-label" for="default-minutes">Default Access Duration (minutes)</label>
+                <input type="number" id="default-minutes" class="settings-input" min="1" max="480">
+            </div>
+            <div class="settings-group">
+                <label class="settings-label" for="cooldown-minutes">Cooldown Period (minutes)</label>
+                <input type="number" id="cooldown-minutes" class="settings-input" min="1" max="480">
+            </div>
+            <button id="save-settings-btn" class="btn-primary" style="width: 100%;">Save Settings</button>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">Emergency Override Code</div>
+            <div class="emergency-code-section">
+                <div style="font-size: 12px; margin-bottom: 8px;">
+                    ⚠️ Keep this code secure. It bypasses the cooldown period.
+                </div>
+                <div id="emergency-code" class="emergency-code-display hidden">
+                    Loading...
+                </div>
+                <button id="toggle-code-btn" class="btn-secondary toggle-code-btn">Show Code</button>
+            </div>
+        </div>
+        
+        <a href="dashboard.html" target="_blank" class="dashboard-link">
+            📊 View Usage Dashboard
+        </a>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
