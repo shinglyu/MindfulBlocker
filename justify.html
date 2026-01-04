@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain Access Justification</title>
+    <script src="justify.js"></script>
+</head>
+<body>
+    <h1>Domain Access Justification</h1>
+    <p>Request for <span id="domain"></span>:</p>
+    <form id="form">
+        <div>
+            <label for="justification">Reason:</label>
+            <textarea id="justification" rows="4" required></textarea>
+        </div>
+        <div>
+            <label>Allow for:</label>
+            <div>
+                <input type="radio" id="5min" name="time" value="5" checked>
+                <label for="5min">5 minutes</label>
+            </div>
+            <div>
+                <input type="radio" id="15min" name="time" value="15">
+                <label for="15min">15 minutes</label>
+            </div>
+            <div>
+                <input type="radio" id="30min" name="time" value="30">
+                <label for="30min">30 minutes</label>
+            </div>
+            <div>
+                <input type="radio" id="1hour" name="time" value="60">
+                <label for="1hour">1 hour</label>
+            </div>
+            <div>
+                <input type="radio" id="2hours" name="time" value="120">
+                <label for="2hours">2 hours</label>
+            </div>
+            <div>
+                <input type="radio" id="custom" name="time" value="custom">
+                <label for="custom">Custom: </label>
+                <input type="number" id="custom-minutes" min="1" disabled> minutes
+            </div>
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
