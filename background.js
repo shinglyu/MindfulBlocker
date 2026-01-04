@@ -22,7 +22,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!result.blockedDomains) {
     await chrome.storage.local.set({
       blockedDomains: [
-        { pattern: 'facebook.com', enabled: true }
+        { pattern: '*.facebook.com', enabled: true }
       ]
     });
   }
@@ -127,24 +127,32 @@ async function shouldBlockDomain(url) {
 
 // Listen for navigation events
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
-  // Only handle main frame navigation
-  if (details.frameId !== 0) return;
-  
-  const url = details.url;
-  
-  // Don't block extension pages
-  if (url.startsWith('chrome-extension://')) return;
-  
-  const blockResult = await shouldBlockDomain(url);
-  
-  if (blockResult.blocked) {
-    const extensionUrl = chrome.runtime.getURL(
-      blockResult.reason === 'cooldown' 
-        ? `blocked.html?url=${encodeURIComponent(url)}`
-        : `justify.html?url=${encodeURIComponent(url)}`
-    );
+  try {
+    // Only handle main frame navigation
+    if (details.frameId !== 0) return;
     
-    chrome.tabs.update(details.tabId, { url: extensionUrl });
+    const url = details.url;
+    
+    // Don't block extension pages
+    if (url.startsWith('chrome-extension://')) return;
+    
+    console.log('Checking URL for blocking:', url);
+    
+    const blockResult = await shouldBlockDomain(url);
+    console.log('Block result:', blockResult);
+    
+    if (blockResult.blocked) {
+      const extensionUrl = chrome.runtime.getURL(
+        blockResult.reason === 'cooldown' 
+          ? `blocked.html?url=${encodeURIComponent(url)}`
+          : `justify.html?url=${encodeURIComponent(url)}`
+      );
+      
+      console.log('Redirecting to:', extensionUrl);
+      chrome.tabs.update(details.tabId, { url: extensionUrl });
+    }
+  } catch (error) {
+    console.error('Error in navigation listener:', error);
   }
 });
 
