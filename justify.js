@@ -19,6 +19,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitButton = form.querySelector('button[type="submit"]');
     const blockImmediatelyBtn = document.getElementById('block-immediately-btn');
     
+    // Breathing exercise elements
+    const breathingOverlay = document.getElementById('breathing-overlay');
+    const breathingCircle = document.getElementById('breathing-circle');
+    const breathingText = document.getElementById('breathing-text');
+    const breathingProgressBar = document.getElementById('breathing-progress-bar');
+    const breathingCyclesText = document.getElementById('breathing-cycles');
+    
+    // Start breathing exercise
+    startBreathingExercise();
+    
     // Enable/disable custom minutes input
     customRadio.addEventListener('change', function() {
         customMinutesInput.disabled = !this.checked;
@@ -99,8 +109,81 @@ document.addEventListener('DOMContentLoaded', function() {
         window.close();
     });
     
-    // Auto-focus justification textarea
-    document.getElementById('justification').focus();
+    /**
+     * Start the breathing exercise before showing the justification form
+     * 4 seconds inhale, 4 seconds exhale, 3 cycles
+     */
+    function startBreathingExercise() {
+        const INHALE_DURATION = 4000; // 4 seconds
+        const EXHALE_DURATION = 4000; // 4 seconds
+        const TOTAL_CYCLES = 3;
+        const CYCLE_DURATION = INHALE_DURATION + EXHALE_DURATION;
+        const TOTAL_DURATION = CYCLE_DURATION * TOTAL_CYCLES;
+        
+        let currentCycle = 1;
+        let isInhaling = true;
+        let startTime = Date.now();
+        
+        // Update breathing animation
+        function updateBreathing() {
+            const elapsed = Date.now() - startTime;
+            const cycleElapsed = elapsed % CYCLE_DURATION;
+            
+            // Determine current cycle
+            currentCycle = Math.floor(elapsed / CYCLE_DURATION) + 1;
+            if (currentCycle > TOTAL_CYCLES) {
+                completeBreathingExercise();
+                return;
+            }
+            
+            // Update cycle text
+            breathingCyclesText.textContent = `Breath ${currentCycle} of ${TOTAL_CYCLES}`;
+            
+            // Update progress bar
+            const progress = (elapsed / TOTAL_DURATION) * 100;
+            breathingProgressBar.style.width = `${Math.min(progress, 100)}%`;
+            
+            // Determine if inhaling or exhaling
+            if (cycleElapsed < INHALE_DURATION) {
+                if (!isInhaling) {
+                    isInhaling = true;
+                    breathingCircle.classList.remove('exhale');
+                    breathingCircle.classList.add('inhale');
+                    breathingText.textContent = 'Inhale';
+                }
+            } else {
+                if (isInhaling) {
+                    isInhaling = false;
+                    breathingCircle.classList.remove('inhale');
+                    breathingCircle.classList.add('exhale');
+                    breathingText.textContent = 'Exhale';
+                }
+            }
+            
+            requestAnimationFrame(updateBreathing);
+        }
+        
+        // Start the animation
+        breathingCircle.classList.add('inhale');
+        breathingText.textContent = 'Inhale';
+        requestAnimationFrame(updateBreathing);
+    }
+    
+    /**
+     * Complete the breathing exercise and show the form
+     */
+    function completeBreathingExercise() {
+        // Hide the breathing overlay
+        breathingOverlay.classList.add('hidden');
+        
+        // Show the form
+        form.classList.remove('hidden');
+        
+        // Focus on justification textarea
+        setTimeout(() => {
+            document.getElementById('justification').focus();
+        }, 500);
+    }
     
     /**
      * Display error message to user
