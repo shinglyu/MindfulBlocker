@@ -132,6 +132,10 @@ async function shouldBlockDomain(url) {
   };
 }
 
+// Track pending navigations to handle redirect chains (e.g., FB redirect pages)
+const pendingNavigations = new Map();
+const REDIRECT_DEBOUNCE_MS = 2000; // Wait 2 seconds to detect redirects
+
 // Listen for navigation events
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   try {
@@ -139,9 +143,34 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     if (details.frameId !== 0) return;
     
     const url = details.url;
+    const tabId = details.tabId;
     
     // Don't block extension pages
     if (url.startsWith('chrome-extension://')) return;
+    
+    // Check if this is a known redirect page (like FB's l.facebook.com)
+    const isRedirectPage = isKnownRedirectPage(url);
+    
+    if (isRedirectPage) {
+      console.log('Detected redirect page, waiting for final destination:', url);
+      // Store the pending navigation and let it proceed
+      // The final destination will be caught by the next navigation event
+      pendingNavigations.set(tabId, {
+        redirectUrl: url,
+        timestamp: Date.now()
+      });
+      return; // Don't block redirect pages, wait for final destination
+    }
+    
+    // Clean up old pending navigations
+    cleanupPendingNavigations();
+    
+    // Check if we were waiting for a redirect from this tab
+    const pending = pendingNavigations.get(tabId);
+    if (pending) {
+      console.log('Redirect completed, blocking final destination:', url);
+      pendingNavigations.delete(tabId);
+    }
     
     console.log('Checking URL for blocking:', url);
     
@@ -162,6 +191,91 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     console.error('Error in navigation listener:', error);
   }
 });
+
+/**
+ * Check if a URL is a known redirect/interstitial page
+ * @param {string} url - The URL to check
+ * @returns {boolean} True if this is a redirect page
+ */
+function isKnownRedirectPage(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    
+    // Known redirect/interstitial domains
+    const redirectPatterns = [
+      'l.facebook.com',      // Facebook external link redirect
+      'lm.facebook.com',     // Facebook mobile redirect
+      'l.instagram.com',     // Instagram external link redirect
+      'l.messenger.com',     // Messenger redirect
+      't.co',                // Twitter/X redirect
+      'youtube.com/redirect', // YouTube redirect (path-based)
+      'out.reddit.com',      // Reddit external link redirect
+      'away.vk.com',         // VK external link redirect
+      'exit.sc',             // SoundCloud exit page
+      'href.li',             // LinkedIn redirect
+    ];
+    
+    // Check hostname matches
+    for (const pattern of redirectPatterns) {
+      if (hostname === pattern) {
+        return true;
+      }
+    }
+    
+    // Check for YouTube redirect specifically (path-based)
+    if (hostname.includes('youtube.com') && url.includes('/redirect')) {
+      return true;
+    }
+    
+    // Check URL parameters for redirect indicators
+    const urlObj = new URL(url);
+    const hasRedirectParam = urlObj.searchParams.has('u') || 
+                             urlObj.searchParams.has('url') || 
+                             urlObj.searchParams.has('q') ||
+                             urlObj.searchParams.has('dest');
+    
+    // Only treat as redirect if it's from a social media domain with redirect params
+    if (hasRedirectParam && isSocialMediaDomain(hostname)) {
+      return true;
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Check if hostname is a social media domain
+ * @param {string} hostname - The hostname to check
+ * @returns {boolean} True if this is a social media domain
+ */
+function isSocialMediaDomain(hostname) {
+  const socialDomains = [
+    'facebook.com', 'fb.com',
+    'instagram.com',
+    'twitter.com', 'x.com',
+    'linkedin.com',
+    'reddit.com',
+    'tiktok.com'
+  ];
+  
+  return socialDomains.some(domain => 
+    hostname === domain || hostname.endsWith('.' + domain)
+  );
+}
+
+/**
+ * Clean up old pending navigations to prevent memory leaks
+ */
+function cleanupPendingNavigations() {
+  const now = Date.now();
+  for (const [tabId, data] of pendingNavigations.entries()) {
+    if (now - data.timestamp > REDIRECT_DEBOUNCE_MS * 2) {
+      pendingNavigations.delete(tabId);
+    }
+  }
+}
 
 // Listen for messages from content pages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

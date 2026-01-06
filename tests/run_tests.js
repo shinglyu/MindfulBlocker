@@ -82,6 +82,39 @@ function extractDomain(url) {
     }
 }
 
+// From background.js - isKnownRedirectPage function
+function isKnownRedirectPage(url) {
+    try {
+        const hostname = new URL(url).hostname;
+        
+        const redirectPatterns = [
+            'l.facebook.com',
+            'lm.facebook.com',
+            'l.instagram.com',
+            'l.messenger.com',
+            't.co',
+            'out.reddit.com',
+            'away.vk.com',
+            'exit.sc',
+            'href.li',
+        ];
+        
+        for (const pattern of redirectPatterns) {
+            if (hostname === pattern) {
+                return true;
+            }
+        }
+        
+        if (hostname.includes('youtube.com') && url.includes('/redirect')) {
+            return true;
+        }
+        
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
 // From blocked.js - formatTimeAgo function
 function formatTimeAgo(timestamp) {
     const now = Date.now();
@@ -223,6 +256,44 @@ test('extractDomain: returns original string for invalid URL', () => {
 
 test('extractDomain: handles empty string', () => {
     assertEqual(extractDomain(''), '');
+});
+
+// ============================================
+// Test Suite: isKnownRedirectPage
+// ============================================
+
+console.log('\n=== isKnownRedirectPage Tests (FB Redirect Handling) ===');
+
+test('isKnownRedirectPage: detects l.facebook.com redirect', () => {
+    assertTrue(isKnownRedirectPage('https://l.facebook.com/l.php?u=https://example.com'));
+});
+
+test('isKnownRedirectPage: detects lm.facebook.com redirect', () => {
+    assertTrue(isKnownRedirectPage('https://lm.facebook.com/l.php?u=https://example.com'));
+});
+
+test('isKnownRedirectPage: detects t.co (Twitter) redirect', () => {
+    assertTrue(isKnownRedirectPage('https://t.co/abc123'));
+});
+
+test('isKnownRedirectPage: detects out.reddit.com redirect', () => {
+    assertTrue(isKnownRedirectPage('https://out.reddit.com/?url=https://example.com'));
+});
+
+test('isKnownRedirectPage: detects YouTube redirect', () => {
+    assertTrue(isKnownRedirectPage('https://www.youtube.com/redirect?q=https://example.com'));
+});
+
+test('isKnownRedirectPage: does not flag regular facebook.com', () => {
+    assertTrue(!isKnownRedirectPage('https://www.facebook.com/profile'));
+});
+
+test('isKnownRedirectPage: does not flag regular websites', () => {
+    assertTrue(!isKnownRedirectPage('https://example.com'));
+});
+
+test('isKnownRedirectPage: handles invalid URLs gracefully', () => {
+    assertTrue(!isKnownRedirectPage('not-a-url'));
 });
 
 // ============================================
