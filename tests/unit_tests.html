@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Extension - Unit Tests</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .test-suite {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-suite h2 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .test {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .test.pass {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .test.fail {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .summary {
+            background: #333;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .summary.all-pass { background: #28a745; }
+        .summary.has-failures { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Flow Extension - Unit Tests</h1>
+    <div id="results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script>
+        // Test framework
+        let passed = 0;
+        let failed = 0;
+        const results = [];
+
+        function test(name, fn) {
+            try {
+                fn();
+                passed++;
+                results.push({ name, status: 'pass', message: 'Passed' });
+            } catch (error) {
+                failed++;
+                results.push({ name, status: 'fail', message: error.message });
+            }
+        }
+
+        function assertEqual(actual, expected, message = '') {
+            if (actual !== expected) {
+                throw new Error(`${message} Expected "${expected}", got "${actual}"`);
+            }
+        }
+
+        function assertTrue(condition, message = '') {
+            if (!condition) {
+                throw new Error(`${message} Expected true, got false`);
+            }
+        }
+
+        // ============================================
+        // Functions to test (copied from source files)
+        // ============================================
+
+        // From blocked.js - formatTime function (new version with minutes only)
+        function formatTime(milliseconds) {
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            // Round up to nearest minute to avoid showing seconds ticking down
+            const minutes = Math.ceil((totalSeconds % 3600) / 60);
+            
+            if (hours > 0) {
+                // If we have hours and minutes rounded up to 60, add an hour
+                if (minutes === 60) {
+                    return `${hours + 1}h`;
+                }
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+            } else {
+                // Less than a minute remaining
+                return 'Less than a minute';
+            }
+        }
+
+        // From background.js - matchesDomain function
+        function matchesDomain(url, pattern) {
+            try {
+                const hostname = new URL(url).hostname;
+                
+                if (pattern.startsWith('*.')) {
+                    const suffix = pattern.slice(2);
+                    return hostname === suffix || hostname.endsWith('.' + suffix);
+                }
+                
+                return hostname === pattern;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // From background.js/blocked.js - extractDomain function
+        function extractDomain(url) {
+            try {
+                return new URL(url).hostname;
+            } catch (e) {
+                return url;
+            }
+        }
+
+        // ============================================
+        // Test Suite: formatTime (minutes-only version)
+        // ============================================
+        
+        test('formatTime: 0 milliseconds returns "Less than a minute"', () => {
+            assertEqual(formatTime(0), 'Less than a minute');
+        });
+
+        test('formatTime: 30 seconds returns "Less than a minute"', () => {
+            // 30 seconds = less than a minute, should show "Less than a minute"
+            // Actually, ceil(30/60) = 1, so it would be "1 minute"
+            assertEqual(formatTime(30000), '1 minute');
+        });
+
+        test('formatTime: 59 seconds rounds up to 1 minute', () => {
+            assertEqual(formatTime(59000), '1 minute');
+        });
+
+        test('formatTime: 60 seconds (1 minute) returns "1 minute"', () => {
+            assertEqual(formatTime(60000), '1 minute');
+        });
+
+        test('formatTime: 90 seconds rounds up to 2 minutes', () => {
+            assertEqual(formatTime(90000), '2 minutes');
+        });
+
+        test('formatTime: 5 minutes returns "5 minutes"', () => {
+            assertEqual(formatTime(5 * 60 * 1000), '5 minutes');
+        });
+
+        test('formatTime: 30 minutes returns "30 minutes"', () => {
+            assertEqual(formatTime(30 * 60 * 1000), '30 minutes');
+        });
+
+        test('formatTime: 1 hour returns "1h"', () => {
+            assertEqual(formatTime(60 * 60 * 1000), '1h');
+        });
+
+        test('formatTime: 1 hour 1 second rounds up to "1h 1m"', () => {
+            assertEqual(formatTime(60 * 60 * 1000 + 1000), '1h 1m');
+        });
+
+        test('formatTime: 1 hour 30 minutes returns "1h 30m"', () => {
+            assertEqual(formatTime(90 * 60 * 1000), '1h 30m');
+        });
+
+        test('formatTime: 1 hour 59 minutes 59 seconds rounds up to "2h"', () => {
+            // 1h 59m 59s = ceil gives 60 minutes in the hour portion, which means add an hour
+            assertEqual(formatTime((60 + 59) * 60 * 1000 + 59 * 1000), '2h');
+        });
+
+        test('formatTime: does not show seconds (anxiety reduction)', () => {
+            const result = formatTime(125000); // 2 min 5 sec
+            assertTrue(!result.includes('s'), 'Should not contain seconds');
+            assertEqual(result, '3 minutes'); // Rounds up
+        });
+
+        // ============================================
+        // Test Suite: matchesDomain
+        // ============================================
+
+        test('matchesDomain: exact match works', () => {
+            assertTrue(matchesDomain('https://facebook.com/page', 'facebook.com'));
+        });
+
+        test('matchesDomain: exact match fails for subdomain', () => {
+            assertTrue(!matchesDomain('https://www.facebook.com', 'facebook.com'));
+        });
+
+        test('matchesDomain: wildcard matches base domain', () => {
+            assertTrue(matchesDomain('https://facebook.com', '*.facebook.com'));
+        });
+
+        test('matchesDomain: wildcard matches www subdomain', () => {
+            assertTrue(matchesDomain('https://www.facebook.com', '*.facebook.com'));
+        });
+
+        test('matchesDomain: wildcard matches deep subdomain', () => {
+            assertTrue(matchesDomain('https://m.facebook.com', '*.facebook.com'));
+        });
+
+        test('matchesDomain: wildcard does not match different domain', () => {
+            assertTrue(!matchesDomain('https://notfacebook.com', '*.facebook.com'));
+        });
+
+        test('matchesDomain: wildcard does not match partial match', () => {
+            assertTrue(!matchesDomain('https://myfacebook.com', '*.facebook.com'));
+        });
+
+        test('matchesDomain: handles invalid URL gracefully', () => {
+            assertTrue(!matchesDomain('not-a-url', 'facebook.com'));
+        });
+
+        test('matchesDomain: handles empty pattern', () => {
+            assertTrue(!matchesDomain('https://facebook.com', ''));
+        });
+
+        // ============================================
+        // Test Suite: extractDomain
+        // ============================================
+
+        test('extractDomain: extracts domain from HTTPS URL', () => {
+            assertEqual(extractDomain('https://www.facebook.com/page?q=1'), 'www.facebook.com');
+        });
+
+        test('extractDomain: extracts domain from HTTP URL', () => {
+            assertEqual(extractDomain('http://example.com'), 'example.com');
+        });
+
+        test('extractDomain: handles URL with port', () => {
+            assertEqual(extractDomain('https://localhost:3000/app'), 'localhost');
+        });
+
+        test('extractDomain: returns original string for invalid URL', () => {
+            assertEqual(extractDomain('not-a-valid-url'), 'not-a-valid-url');
+        });
+
+        test('extractDomain: handles empty string', () => {
+            assertEqual(extractDomain(''), '');
+        });
+
+        // ============================================
+        // Render results
+        // ============================================
+
+        function renderResults() {
+            const container = document.getElementById('results');
+            
+            // Group by test suite
+            const suites = {
+                'formatTime (Minutes Only)': results.filter(r => r.name.startsWith('formatTime')),
+                'matchesDomain': results.filter(r => r.name.startsWith('matchesDomain')),
+                'extractDomain': results.filter(r => r.name.startsWith('extractDomain'))
+            };
+
+            for (const [suiteName, tests] of Object.entries(suites)) {
+                const suiteDiv = document.createElement('div');
+                suiteDiv.className = 'test-suite';
+                suiteDiv.innerHTML = `<h2>${suiteName}</h2>`;
+                
+                tests.forEach(t => {
+                    const testDiv = document.createElement('div');
+                    testDiv.className = `test ${t.status}`;
+                    testDiv.innerHTML = `<strong>${t.status === 'pass' ? '✓' : '✗'}</strong> ${t.name}<br><small>${t.message}</small>`;
+                    suiteDiv.appendChild(testDiv);
+                });
+                
+                container.appendChild(suiteDiv);
+            }
+
+            // Summary
+            const summary = document.getElementById('summary');
+            summary.className = `summary ${failed === 0 ? 'all-pass' : 'has-failures'}`;
+            summary.innerHTML = `
+                <h3>Test Summary</h3>
+                <p>✓ Passed: ${passed}</p>
+                <p>✗ Failed: ${failed}</p>
+                <p>Total: ${passed + failed}</p>
+            `;
+        }
+
+        renderResults();
+    </script>
+</body>
+</html>

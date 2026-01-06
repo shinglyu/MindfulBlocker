@@ -7,6 +7,25 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Breathing Exercise Overlay -->
+    <div id="breathing-overlay" class="breathing-overlay">
+        <div class="breathing-container">
+            <h2>Take a moment to breathe</h2>
+            <p class="breathing-subtitle">Before making your decision, let's take a few deep breaths</p>
+            
+            <div class="breathing-circle-container">
+                <div id="breathing-circle" class="breathing-circle"></div>
+                <div id="breathing-text" class="breathing-text">Inhale</div>
+            </div>
+            
+            <div class="breathing-progress">
+                <div id="breathing-progress-bar" class="breathing-progress-bar"></div>
+            </div>
+            
+            <p id="breathing-cycles" class="breathing-cycles">Breath 1 of 3</p>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>⏱️ Access Request</h1>
@@ -15,7 +34,7 @@
         <div class="content">
             <p class="domain-info">You're requesting access to <strong id="domain"></strong></p>
             
-            <form id="form">
+            <form id="form" class="hidden">
                 <div class="form-group">
                     <label for="justification">Why do you need to access this site?</label>
                     <textarea id="justification" rows="4" required placeholder="Enter your reason for accessing this site..."></textarea>

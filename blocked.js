@@ -69,15 +69,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatTime(milliseconds) {
         const totalSeconds = Math.floor(milliseconds / 1000);
         const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
+        // Round up to nearest minute to avoid showing seconds ticking down
+        const minutes = Math.ceil((totalSeconds % 3600) / 60);
         
         if (hours > 0) {
-            return `${hours}h ${minutes}m ${seconds}s`;
+            // If we have hours and minutes rounded up to 60, add an hour
+            if (minutes === 60) {
+                return `${hours + 1}h`;
+            }
+            // If exactly on the hour, just show hours
+            if (minutes === 0) {
+                return `${hours}h`;
+            }
+            return `${hours}h ${minutes}m`;
         } else if (minutes > 0) {
-            return `${minutes}m ${seconds}s`;
+            return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
         } else {
-            return `${seconds}s`;
+            // Less than a minute remaining
+            return 'Less than a minute';
         }
     }
     
