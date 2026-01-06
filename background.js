@@ -31,6 +31,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!result.usageLogs) {
     await chrome.storage.local.set({ usageLogs: [] });
   }
+  
+  if (!result.accessAttempts) {
+    await chrome.storage.local.set({ accessAttempts: {} });
+  }
 });
 
 /**
@@ -195,6 +199,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleCheckPermissionStatus(message, sendResponse);
     return true;
   }
+  
+  if (message.action === 'recordAccessAttempt') {
+    handleRecordAccessAttempt(message, sendResponse);
+    return true;
+  }
+  
+  if (message.action === 'getAccessAttempts') {
+    handleGetAccessAttempts(message, sendResponse);
+    return true;
+  }
 });
 
 /**
@@ -320,6 +334,75 @@ async function handleGetUsageLogs(sendResponse) {
   } catch (error) {
     console.error('Error getting usage logs:', error);
     sendResponse({ usageLogs: [], error: error.message });
+  }
+}
+
+/**
+ * Record an access attempt for a domain
+ */
+async function handleRecordAccessAttempt(message, sendResponse) {
+  try {
+    const { domain } = message;
+    const now = Date.now();
+    const today = new Date().toDateString();
+    
+    const { accessAttempts } = await chrome.storage.local.get('accessAttempts');
+    const attempts = accessAttempts || {};
+    
+    if (!attempts[domain]) {
+      attempts[domain] = {
+        count: 0,
+        lastAttempt: null,
+        date: today
+      };
+    }
+    
+    // Reset count if it's a new day
+    if (attempts[domain].date !== today) {
+      attempts[domain].count = 0;
+      attempts[domain].date = today;
+    }
+    
+    // Increment count and update last attempt
+    attempts[domain].count++;
+    attempts[domain].lastAttempt = now;
+    
+    await chrome.storage.local.set({ accessAttempts: attempts });
+    
+    sendResponse({ 
+      success: true, 
+      count: attempts[domain].count,
+      lastAttempt: attempts[domain].lastAttempt
+    });
+  } catch (error) {
+    console.error('Error recording access attempt:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Get access attempts for a domain
+ */
+async function handleGetAccessAttempts(message, sendResponse) {
+  try {
+    const { domain } = message;
+    const today = new Date().toDateString();
+    
+    const { accessAttempts } = await chrome.storage.local.get('accessAttempts');
+    const attempts = accessAttempts || {};
+    
+    if (!attempts[domain] || attempts[domain].date !== today) {
+      sendResponse({ count: 0, lastAttempt: null });
+      return;
+    }
+    
+    sendResponse({
+      count: attempts[domain].count,
+      lastAttempt: attempts[domain].lastAttempt
+    });
+  } catch (error) {
+    console.error('Error getting access attempts:', error);
+    sendResponse({ count: 0, lastAttempt: null, error: error.message });
   }
 }
 

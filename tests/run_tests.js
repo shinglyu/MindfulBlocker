@@ -82,6 +82,24 @@ function extractDomain(url) {
     }
 }
 
+// From blocked.js - formatTimeAgo function
+function formatTimeAgo(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+        return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    } else if (minutes > 0) {
+        return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    } else {
+        return 'just now';
+    }
+}
+
 // ============================================
 // Test Suite: formatTime (minutes-only version)
 // ============================================
@@ -205,6 +223,52 @@ test('extractDomain: returns original string for invalid URL', () => {
 
 test('extractDomain: handles empty string', () => {
     assertEqual(extractDomain(''), '');
+});
+
+// ============================================
+// Test Suite: formatTimeAgo
+// ============================================
+
+console.log('\n=== formatTimeAgo Tests ===');
+
+test('formatTimeAgo: just now (0 seconds ago)', () => {
+    const now = Date.now();
+    assertEqual(formatTimeAgo(now), 'just now');
+});
+
+test('formatTimeAgo: just now (30 seconds ago)', () => {
+    const thirtySecondsAgo = Date.now() - 30 * 1000;
+    assertEqual(formatTimeAgo(thirtySecondsAgo), 'just now');
+});
+
+test('formatTimeAgo: 1 minute ago', () => {
+    const oneMinuteAgo = Date.now() - 60 * 1000;
+    assertEqual(formatTimeAgo(oneMinuteAgo), '1 minute ago');
+});
+
+test('formatTimeAgo: 5 minutes ago', () => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    assertEqual(formatTimeAgo(fiveMinutesAgo), '5 minutes ago');
+});
+
+test('formatTimeAgo: 59 minutes ago', () => {
+    const fiftyNineMinutesAgo = Date.now() - 59 * 60 * 1000;
+    assertEqual(formatTimeAgo(fiftyNineMinutesAgo), '59 minutes ago');
+});
+
+test('formatTimeAgo: 1 hour ago', () => {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    assertEqual(formatTimeAgo(oneHourAgo), '1 hour ago');
+});
+
+test('formatTimeAgo: 2 hours ago', () => {
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    assertEqual(formatTimeAgo(twoHoursAgo), '2 hours ago');
+});
+
+test('formatTimeAgo: 24 hours ago', () => {
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    assertEqual(formatTimeAgo(twentyFourHoursAgo), '24 hours ago');
 });
 
 // ============================================

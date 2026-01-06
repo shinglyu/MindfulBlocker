@@ -15,6 +15,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let countdownInterval = null;
     
+    // Record this access attempt and get attempt stats
+    recordAndDisplayAttempts();
+    
     // Check permission status and start countdown
     checkPermissionStatus();
     
@@ -23,6 +26,66 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         chrome.runtime.openOptionsPage();
     });
+    
+    /**
+     * Record this access attempt and display attempt statistics
+     */
+    function recordAndDisplayAttempts() {
+        // First record the attempt
+        chrome.runtime.sendMessage({
+            action: 'recordAccessAttempt',
+            domain: domain
+        }, function(response) {
+            if (chrome.runtime.lastError) {
+                console.error('Error recording attempt:', chrome.runtime.lastError);
+                return;
+            }
+            
+            // Now get and display the attempt stats
+            displayAttemptStats(response.count, response.lastAttempt);
+        });
+    }
+    
+    /**
+     * Display attempt statistics
+     * @param {number} count - Number of attempts today
+     * @param {number} lastAttempt - Timestamp of last attempt
+     */
+    function displayAttemptStats(count, lastAttempt) {
+        const attemptCountEl = document.getElementById('attempt-count');
+        const lastAttemptEl = document.getElementById('last-attempt');
+        
+        if (count > 0) {
+            attemptCountEl.textContent = `You have tried to access this site ${count} time${count !== 1 ? 's' : ''} today.`;
+            
+            if (lastAttempt) {
+                const timeAgo = formatTimeAgo(lastAttempt);
+                lastAttemptEl.textContent = `Last attempt: ${timeAgo}`;
+            }
+        }
+    }
+    
+    /**
+     * Format a timestamp as a relative time string
+     * @param {number} timestamp - The timestamp to format
+     * @returns {string} Relative time string (e.g., "5 minutes ago")
+     */
+    function formatTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        
+        if (hours > 0) {
+            return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        } else if (minutes > 0) {
+            return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        } else {
+            return 'just now';
+        }
+    }
     
     function checkPermissionStatus() {
         chrome.runtime.sendMessage({

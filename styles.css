@@ -204,6 +204,29 @@ body {
     font-size: 14px;
 }
 
+/* Attempt Stats */
+.attempt-stats {
+    text-align: center;
+    margin: 20px 0;
+    padding: 16px;
+    background: #fff3cd;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+}
+
+.attempt-count {
+    font-size: 16px;
+    font-weight: 600;
+    color: #856404;
+    margin-bottom: 4px;
+}
+
+.last-attempt {
+    font-size: 14px;
+    color: #856404;
+    opacity: 0.8;
+}
+
 /* Cooldown Timer */
 .cooldown-timer {
     text-align: center;
