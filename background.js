@@ -334,10 +334,30 @@ function pruneOldLogs(logs) {
   const MAX_LOGS = 1000;
   const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
   const cutoffTime = Date.now() - MAX_AGE_MS;
-  
+
   return logs
     .filter(log => log.grantedAt > cutoffTime)
     .slice(-MAX_LOGS);
+}
+
+/**
+ * Prune old access attempts to prevent unbounded storage growth
+ * @param {Object} attempts - Object containing access attempts per domain
+ * @returns {Object} Pruned attempts object
+ */
+function pruneOldAccessAttempts(attempts) {
+  const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+  const cutoffTime = Date.now() - MAX_AGE_MS;
+  const pruned = {};
+
+  for (const [domain, data] of Object.entries(attempts)) {
+    // Keep attempts if they have recent activity (lastAttempt within 90 days)
+    if (data.lastAttempt && data.lastAttempt > cutoffTime) {
+      pruned[domain] = data;
+    }
+  }
+
+  return pruned;
 }
 
 /**
@@ -480,8 +500,11 @@ async function handleRecordAccessAttempt(message, sendResponse) {
     // Increment count and update last attempt
     attempts[domain].count++;
     attempts[domain].lastAttempt = now;
-    
-    await chrome.storage.local.set({ accessAttempts: attempts });
+
+    // Prune old access attempts to prevent unbounded growth
+    const prunedAttempts = pruneOldAccessAttempts(attempts);
+
+    await chrome.storage.local.set({ accessAttempts: prunedAttempts });
     
     sendResponse({ 
       success: true, 
