@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Start breathing exercise
     startBreathingExercise();
-    
+
+    // Record this access attempt and get attempt stats
+    recordAndDisplayAttempts();
+
     // Enable/disable custom minutes input
     customRadio.addEventListener('change', function() {
         customMinutesInput.disabled = !this.checked;
@@ -111,61 +114,64 @@ document.addEventListener('DOMContentLoaded', function() {
     
     /**
      * Start the breathing exercise before showing the justification form
-     * 4 seconds inhale, 4 seconds exhale, 3 cycles
+     * 4-4-4-4 breathing: inhale 4, hold 4, exhale 4, hold 4 (single cycle)
      */
     function startBreathingExercise() {
         const INHALE_DURATION = 4000; // 4 seconds
+        const HOLD_IN_DURATION = 4000; // 4 seconds
         const EXHALE_DURATION = 4000; // 4 seconds
-        const TOTAL_CYCLES = 3;
-        const CYCLE_DURATION = INHALE_DURATION + EXHALE_DURATION;
-        const TOTAL_DURATION = CYCLE_DURATION * TOTAL_CYCLES;
-        
-        let currentCycle = 1;
-        let isInhaling = true;
+        const HOLD_OUT_DURATION = 4000; // 4 seconds
+        const TOTAL_DURATION = INHALE_DURATION + HOLD_IN_DURATION + EXHALE_DURATION + HOLD_OUT_DURATION;
+
         let startTime = Date.now();
-        
+
         // Update breathing animation
         function updateBreathing() {
             const elapsed = Date.now() - startTime;
-            const cycleElapsed = elapsed % CYCLE_DURATION;
-            
-            // Determine current cycle
-            currentCycle = Math.floor(elapsed / CYCLE_DURATION) + 1;
-            if (currentCycle > TOTAL_CYCLES) {
+
+            if (elapsed >= TOTAL_DURATION) {
                 completeBreathingExercise();
                 return;
             }
-            
-            // Update cycle text
-            breathingCyclesText.textContent = `Breath ${currentCycle} of ${TOTAL_CYCLES}`;
-            
+
             // Update progress bar
             const progress = (elapsed / TOTAL_DURATION) * 100;
             breathingProgressBar.style.width = `${Math.min(progress, 100)}%`;
-            
-            // Determine if inhaling or exhaling
-            if (cycleElapsed < INHALE_DURATION) {
-                if (!isInhaling) {
-                    isInhaling = true;
-                    breathingCircle.classList.remove('exhale');
-                    breathingCircle.classList.add('inhale');
-                    breathingText.textContent = 'Inhale';
-                }
+
+            // Determine current phase
+            if (elapsed < INHALE_DURATION) {
+                // Inhale phase
+                breathingCircle.classList.remove('hold-in', 'exhale', 'hold-out');
+                breathingCircle.classList.add('inhale');
+                breathingText.textContent = 'Inhale';
+                breathingCyclesText.textContent = 'Breathing Exercise';
+            } else if (elapsed < INHALE_DURATION + HOLD_IN_DURATION) {
+                // Hold in phase
+                breathingCircle.classList.remove('inhale', 'exhale', 'hold-out');
+                breathingCircle.classList.add('hold-in');
+                breathingText.textContent = 'Hold';
+                breathingCyclesText.textContent = 'Breathing Exercise';
+            } else if (elapsed < INHALE_DURATION + HOLD_IN_DURATION + EXHALE_DURATION) {
+                // Exhale phase
+                breathingCircle.classList.remove('inhale', 'hold-in', 'hold-out');
+                breathingCircle.classList.add('exhale');
+                breathingText.textContent = 'Exhale';
+                breathingCyclesText.textContent = 'Breathing Exercise';
             } else {
-                if (isInhaling) {
-                    isInhaling = false;
-                    breathingCircle.classList.remove('inhale');
-                    breathingCircle.classList.add('exhale');
-                    breathingText.textContent = 'Exhale';
-                }
+                // Hold out phase
+                breathingCircle.classList.remove('inhale', 'hold-in', 'exhale');
+                breathingCircle.classList.add('hold-out');
+                breathingText.textContent = 'Hold';
+                breathingCyclesText.textContent = 'Breathing Exercise';
             }
-            
+
             requestAnimationFrame(updateBreathing);
         }
-        
+
         // Start the animation
         breathingCircle.classList.add('inhale');
         breathingText.textContent = 'Inhale';
+        breathingCyclesText.textContent = 'Breathing Exercise';
         requestAnimationFrame(updateBreathing);
     }
     
@@ -203,6 +209,66 @@ document.addEventListener('DOMContentLoaded', function() {
         errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     
+    /**
+     * Record this access attempt and display attempt statistics
+     */
+    function recordAndDisplayAttempts() {
+        // First record the attempt
+        chrome.runtime.sendMessage({
+            action: 'recordAccessAttempt',
+            domain: domain
+        }, function(response) {
+            if (chrome.runtime.lastError) {
+                console.error('Error recording attempt:', chrome.runtime.lastError);
+                return;
+            }
+
+            // Now get and display the attempt stats
+            displayAttemptStats(response.count, response.lastAttempt);
+        });
+    }
+
+    /**
+     * Display attempt statistics
+     * @param {number} count - Number of attempts today
+     * @param {number} lastAttempt - Timestamp of last attempt
+     */
+    function displayAttemptStats(count, lastAttempt) {
+        const attemptCountEl = document.getElementById('attempt-count');
+        const lastAttemptEl = document.getElementById('last-attempt');
+
+        if (count > 0) {
+            attemptCountEl.textContent = `You have tried to access this site ${count} time${count !== 1 ? 's' : ''} today.`;
+
+            if (lastAttempt) {
+                const timeAgo = formatTimeAgo(lastAttempt);
+                lastAttemptEl.textContent = `Last attempt: ${timeAgo}`;
+            }
+        }
+    }
+
+    /**
+     * Format a timestamp as a relative time string
+     * @param {number} timestamp - The timestamp to format
+     * @returns {string} Relative time string (e.g., "5 minutes ago")
+     */
+    function formatTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+
+        if (hours > 0) {
+            return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        } else if (minutes > 0) {
+            return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        } else {
+            return 'just now';
+        }
+    }
+
     /**
      * Extract domain from URL
      * @param {string} url - URL to extract domain from

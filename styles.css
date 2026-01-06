@@ -406,7 +406,15 @@ body {
     transform: scale(1.8);
 }
 
+.breathing-circle.hold-in {
+    transform: scale(1.8);
+}
+
 .breathing-circle.exhale {
+    transform: scale(1);
+}
+
+.breathing-circle.hold-out {
     transform: scale(1);
 }
 
